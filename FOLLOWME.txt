@@ -1,0 +1,163 @@
+#include <SPI.h>  
+#include <Pixy.h>
+#include <Servo.h>
+#include <Wire.h> 
+#include <LiquidCrystal_I2C.h>
+
+#define X_CENTER    160L
+#define Y_CENTER    75L
+#define WINDOW 100L
+#define SIZE_THRES 100
+#define trigPin 6
+#define echoPin 7
+#define DISTANCE 20
+
+// Instantate objects
+Servo servoLeft, servoRight;
+Pixy pixy;
+LiquidCrystal_I2C lcd(0x27,16,2);  // set the LCD address to 0x27 for a 20 chars and 4 line display
+
+uint16_t x = 53;
+int32_t objsize;
+
+void setup()
+{
+  // start lcd
+  lcd.init();
+   lcd.setCursor(6,0);
+   lcd.print("Hello");
+   delay(3000);
+   lcd.clear();
+   lcd.setCursor(3,0);
+   lcd.print("My name is");
+   lcd.setCursor(4,1);
+   lcd.print("Follow Me");
+   delay(2000);
+   lcd.clear();
+   lcd.setCursor(4,0);
+   lcd.print("Let's Go");
+   
+   // set intrupt, servos, and ultra sonic sensor
+   attachInterrupt(0, halt, LOW);
+   pinMode(trigPin, OUTPUT);
+   pinMode(echoPin, INPUT);
+   servoLeft.attach(9);   
+   servoRight.attach(8);
+  
+  // start pixy  
+   pixy.init();
+   
+   
+}
+
+void loop()
+{ 
+  static int i = 0;
+  int j;
+  uint16_t blocks;
+  long distance;
+  
+  // get distance and stop if ready
+  distance = getDistance();
+   
+  if (distance < DISTANCE) 
+  {  
+    stopMoving();
+    delay(500);
+    moveBack();
+    delay(1000);
+    turnRight();
+    delay(2000);
+  }  
+  
+  // get objects from pixy
+  blocks = pixy.getBlocks(); 
+  
+  // if a target is found
+  if (blocks)
+  {    
+      // get the x postions  
+       x = pixy.blocks[0].x;
+       
+       // get size
+       objsize = pixy.blocks[0].width * pixy.blocks[0].height;
+       
+       // if the object is to the right turn right
+       if (x > X_CENTER + WINDOW)
+       {
+         turnRight();
+       } 
+       
+       // if the object is to the left turn left
+       if (x < X_CENTER - WINDOW)
+       {
+         turnLeft();
+       }
+       
+       // if the size of the object is in the middle
+       if (x < X_CENTER + WINDOW && x > X_CENTER - WINDOW)
+       {
+           
+            if (objsize < SIZE_THRES) 
+         {
+           moveForward();
+         }
+         
+         else if (objsize > SIZE_THRES)
+         {
+           stopMoving();
+         }
+       }   
+    }
+}  
+
+
+void moveForward()
+{
+servoLeft.write(135);
+servoRight.write(45);
+}
+
+void moveBack() 
+{
+servoLeft.write(0);
+servoRight.write(180);
+}
+
+void turnRight() 
+{
+servoLeft.write(180);
+servoRight.write(180);
+}
+
+void turnLeft() 
+{
+servoLeft.write(0);
+servoRight.write(0);
+}
+
+void stopMoving()
+{
+servoLeft.write(90);
+servoRight.write(90);
+}
+
+long getDistance()
+{
+   long duration, distance;
+   digitalWrite(trigPin, LOW); 
+   delayMicroseconds(2); 
+   digitalWrite(trigPin, HIGH);
+   delayMicroseconds(10);
+   digitalWrite(trigPin, LOW);
+   
+   duration = pulseIn(echoPin, HIGH);
+   distance = (duration/2) / 29.1;
+   
+   return distance;
+}
+
+void halt()
+{  
+  stopMoving;
+}
